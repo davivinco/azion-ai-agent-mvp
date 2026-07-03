@@ -1,0 +1,55 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      DEFAULT_CLIENT_ID: 9152i
+      NEXT_PUBLIC_APP_NAME: Azion AI Agent
+      AUDIT_DB_PATH: /data/audit.sqlite
+      LLM_MODEL: Qwen/Qwen3-30B-A3B-Instruct-2507-FP8
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_CHAT_PATH: /v1/chat/completions
+      LLM_BASE_URL: https://qovc2bbe89.map.azionedge.net
+      AGENT_PLANNER_MODE: llm
+      MCP_SERVER_URL: http://mcp:3333
+    volumes:
+      - audit-data:/data
+    depends_on:
+      - redis
+      - mcp
+
+  mcp:
+    build:
+      context: .
+      dockerfile: services/mcp-server/Dockerfile
+    ports:
+      - "3333:3333"
+    environment:
+      AZION_API_BASE_URL: https://api.azion.com/v4
+      PORT: 3333
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379
+      MCP_SERVER_URL: http://mcp:3333
+      AUDIT_DB_PATH: /data/audit.sqlite
+    volumes:
+      - audit-data:/data
+    depends_on:
+      - redis
+      - mcp
+
+  redis:
+    image: valkey/valkey:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  audit-data:

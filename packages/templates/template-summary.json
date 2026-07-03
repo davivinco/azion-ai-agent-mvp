@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-06-18T18:11:55.449749Z",
+  "sources": {
+    "firewall_id": 44495,
+    "application_id": 1756827464,
+    "client_id": "9152i"
+  },
+  "defaults": {
+    "all_created_resources_active": false,
+    "unless_user_explicitly_requests_active": true
+  },
+  "template_contents": {
+    "firewall_rules": [
+      "[DROP] Protect TOR Network",
+      "[DENY] - UA Invalidos",
+      "[Rate Limit] Rate Limit por segundo - Cloud Providers (5/s)",
+      "[Rate Limit] Rate Limit por minuto - Cloud Providers",
+      "[WAF] Template"
+    ],
+    "firewall_functions": [
+      "HoneyPot"
+    ],
+    "application_cache_settings": [
+      "Default Cache Settings",
+      "Cache for Fonts 2m-1D-QSALL-CKNO",
+      "Cache for Images 2m-7d-QSALL-CKNO",
+      "Cache for Static 1m-1D-QSALL-CKNO"
+    ],
+    "application_request_rules": [
+      "Default Rule",
+      "[IMAGE] Set Cache for Images",
+      "[FONTS]Set Cache for Fonts",
+      "[STATIC] Set Cache for Static"
+    ],
+    "application_response_rules": [
+      "Enable GZIP"
+    ],
+    "application_device_groups": 0,
+    "application_functions": 0,
+    "application_connector_default": {
+      "type": "http",
+      "address": "httpbingo.org",
+      "host": "httpbingo.org"
+    },
+    "application_workload_domain_default": "random .com.br when not provided"
+  },
+  "required_follow_up_exports": [],
+  "known_external_references": {
+    "network_lists": [
+      2,
+      47716
+    ],
+    "waf_id": 14289,
+    "connector_id": "replaced at runtime by new httpbingo.org connector",
+    "firewall_base_function_id": 51884,
+    "honeypot_network_list_id": 53408
+  }
+}

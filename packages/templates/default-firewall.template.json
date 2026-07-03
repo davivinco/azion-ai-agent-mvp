@@ -1,0 +1,233 @@
+{
+  "template_name": "default_firewall_from_44495",
+  "source": {
+    "firewall_id": 44495,
+    "firewall_name": "Edge Firewall Template Azion"
+  },
+  "defaults": {
+    "active": false,
+    "debug": false
+  },
+  "firewall": {
+    "source_id": 44495,
+    "name": "Edge Firewall Template Azion",
+    "modules": {
+      "ddos_protection": {
+        "enabled": true
+      },
+      "functions": {
+        "enabled": true
+      },
+      "network_protection": {
+        "enabled": true
+      },
+      "waf": {
+        "enabled": true
+      }
+    },
+    "debug": false,
+    "active": false
+  },
+  "functions": [
+    {
+      "source_id": 14057,
+      "name": "HoneyPot",
+      "args": {
+        "custom_message": "Acesso negado.",
+        "network_list_id": "53408",
+        "block_ttl_seconds": "8400"
+      },
+      "azion_form": {},
+      "function": 51884,
+      "active": false
+    }
+  ],
+  "request_rules": [
+    {
+      "source_id": 85327,
+      "name": "[DROP] Protect TOR Network",
+      "active": false,
+      "criteria": [
+        [
+          {
+            "conditional": "if",
+            "variable": "${network}",
+            "operator": "is_in_list",
+            "argument": 2
+          }
+        ]
+      ],
+      "behaviors": [
+        {
+          "type": "drop"
+        }
+      ],
+      "description": "Bloqueio dos nó de saida da rede tor  :: status = 444",
+      "order": 0
+    },
+    {
+      "source_id": 85328,
+      "name": "[DENY] - UA Invalidos",
+      "active": false,
+      "criteria": [
+        [
+          {
+            "conditional": "if",
+            "variable": "${header_accept}",
+            "operator": "matches",
+            "argument": "Mozilla/[1-4]|Chrome(\\/|\\:|\\ |:\\ )[1-9][0-9]\\.|Chrome\\/101\\.0|Firefox(\\/|\\:|\\ |:\\ )[1-9][0-9]\\."
+          },
+          {
+            "conditional": "and",
+            "variable": "${header_user_agent}",
+            "operator": "does_not_match",
+            "argument": "facebookexternalhit|Twitterbot|[P|p]interest|AdsBot-Google|AppEngine-Google|[G|g]ooglebot|Google\\ SketchUp|Mediapartners-Google|GoogleImageProxy|googleweblight|Google-Read-Aloud|bingbot|BingPreview|msnbot|WhatsApp|YahooSeeker|YahooMobileMail|Yahoo!|Outlook|Slackbot|Slack-ImgProxy|Yandex|SemrushBot|Amazon-Route53-Health-Check|FreshpingBot|PingdomTMS|[P|p]ingdom\\.com|[a|A]pplebot|Storebot-Google|GoogleOther|Google-Site-Verification|FeedFetcher-Google|GoogleProducer|APIs-Google\\.html|Google-InspectionTool|[lL]ighthouse"
+          },
+          {
+            "conditional": "and",
+            "variable": "${header_user_agent}",
+            "operator": "does_not_match",
+            "argument": "(Amazon-Route53-Health-Check-Service|simplex|gpa-allow-az-botm-v1|GoogleAssociationService)"
+          }
+        ]
+      ],
+      "behaviors": [
+        {
+          "type": "deny"
+        }
+      ],
+      "description": "Relação de UA inválidos",
+      "order": 1
+    },
+    {
+      "source_id": 85329,
+      "name": "[Rate Limit] Rate Limit por segundo - Cloud Providers (5/s)",
+      "active": false,
+      "criteria": [
+        [
+          {
+            "conditional": "if",
+            "variable": "${network}",
+            "operator": "is_in_list",
+            "argument": 47716
+          },
+          {
+            "conditional": "and",
+            "variable": "${header_user_agent}",
+            "operator": "does_not_match",
+            "argument": "facebookexternalhit|Twitterbot|[P|p]interest|AdsBot-Google|AppEngine-Google|[G|g]ooglebot|Google\\ SketchUp|Mediapartners-Google|GoogleImageProxy|googleweblight|Google-Read-Aloud|bingbot|BingPreview|msnbot|WhatsApp|YahooSeeker|YahooMobileMail|Yahoo!|Outlook|Slackbot|Slack-ImgProxy|Yandex|SemrushBot|Amazon-Route53-Health-Check|FreshpingBot|PingdomTMS|[P|p]ingdom\\.com|[a|A]pplebot|Storebot-Google|GoogleOther|Google-Site-Verification|FeedFetcher-Google|GoogleProducer|APIs-Google\\.html|Google-InspectionTool"
+          },
+          {
+            "conditional": "and",
+            "variable": "${header_user_agent}",
+            "operator": "does_not_match",
+            "argument": "(Amazon-Route53-Health-Check-Service|simplex|gpa-allow-az-botm-v1|GoogleAssociationService)"
+          },
+          {
+            "conditional": "and",
+            "variable": "${request_uri}",
+            "operator": "does_not_match",
+            "argument": "\\.(css|js|ttf|eof|woff|woff2|svg|jpg|jpeg|gif|bmp|png|ico)(\\?.*)?$"
+          },
+          {
+            "conditional": "and",
+            "variable": "${network}",
+            "operator": "is_not_in_list",
+            "argument": 50628
+          }
+        ]
+      ],
+      "behaviors": [
+        {
+          "type": "set_rate_limit",
+          "attributes": {
+            "type": "second",
+            "limit_by": "client_ip",
+            "average_rate_limit": 5,
+            "maximum_burst_size": 25
+          }
+        }
+      ],
+      "description": "5 Req/s - Client IP - status 429",
+      "order": 2
+    },
+    {
+      "source_id": 85337,
+      "name": "[Rate Limit] Rate Limit por minuto - Cloud Providers",
+      "active": false,
+      "criteria": [
+        [
+          {
+            "conditional": "if",
+            "variable": "${network}",
+            "operator": "is_in_list",
+            "argument": 47716
+          },
+          {
+            "conditional": "and",
+            "variable": "${header_user_agent}",
+            "operator": "does_not_match",
+            "argument": "facebookexternalhit|Twitterbot|[P|p]interest|AdsBot-Google|AppEngine-Google|[G|g]ooglebot|Google\\ SketchUp|Mediapartners-Google|GoogleImageProxy|googleweblight|Google-Read-Aloud|bingbot|BingPreview|msnbot|WhatsApp|YahooSeeker|YahooMobileMail|Yahoo!|Outlook|Slackbot|Slack-ImgProxy|Yandex|SemrushBot|Amazon-Route53-Health-Check|FreshpingBot|PingdomTMS|[P|p]ingdom\\.com|[a|A]pplebot|Storebot-Google|GoogleOther|Google-Site-Verification|FeedFetcher-Google|GoogleProducer|APIs-Google\\.html|Google-InspectionTool"
+          },
+          {
+            "conditional": "and",
+            "variable": "${header_user_agent}",
+            "operator": "does_not_match",
+            "argument": "(Amazon-Route53-Health-Check-Service|simplex|gpa-allow-az-botm-v1|GoogleAssociationService)"
+          },
+          {
+            "conditional": "and",
+            "variable": "${request_uri}",
+            "operator": "does_not_match",
+            "argument": "\\.(css|js|ttf|eof|woff|woff2|svg|jpg|jpeg|gif|bmp|png|ico)(\\?.*)?$"
+          },
+          {
+            "conditional": "and",
+            "variable": "${network}",
+            "operator": "is_not_in_list",
+            "argument": 50628
+          }
+        ]
+      ],
+      "behaviors": [
+        {
+          "type": "set_rate_limit",
+          "attributes": {
+            "type": "minute",
+            "limit_by": "client_ip",
+            "average_rate_limit": 30,
+            "maximum_burst_size": null
+          }
+        }
+      ],
+      "description": "30 Req/min - Client IP",
+      "order": 3
+    },
+    {
+      "source_id": 85338,
+      "name": "[WAF] Template",
+      "active": false,
+      "criteria": [
+        [
+          {
+            "conditional": "if",
+            "variable": "${request_uri}",
+            "operator": "does_not_match",
+            "argument": "\\.(css|js|ttf|eof|woff|woff2|svg|jpg|jpeg|gif|bmp|png|ico)(\\?.*)?$"
+          }
+        ]
+      ],
+      "behaviors": [
+        {
+          "type": "set_waf",
+          "attributes": {
+            "waf_id": 14289,
+            "mode": "blocking"
+          }
+        }
+      ],
+      "description": "Após regras acima na camada 3 e 4, agora vamos invocar o WAF camada 7",
+      "order": 4
+    }
+  ]
+}
