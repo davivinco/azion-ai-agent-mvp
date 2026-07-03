@@ -71,6 +71,32 @@ function isApexNameserverRecord(name: string, type: string) {
   return name === "@" && (type === "NS" || type === "SOA")
 }
 
+function unwrapMarkdownLinks(text: string): string {
+  return text.replace(/\[([^\]\n]+)\]\(https?:\/\/[^)\s]+\)/g, "$1")
+}
+
+function stripLineComment(line: string): { record: string, comment: string } {
+  // BIND/RFC1035 semantics: ';' starts a comment to end of line, unless inside quotes.
+  let inQuotes = false
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+
+    if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ";" && !inQuotes) {
+      return { record: line.slice(0, index), comment: line.slice(index + 1) }
+    }
+  }
+
+  return { record: line, comment: "" }
+}
+
+function extractCloudflareProxiedTag(comment: string): boolean | null {
+  const match = comment.match(/cf_tags=cf-proxied:(true|false)/i)
+  return match ? match[1].toLowerCase() === "true" : null
+}
+
 function splitCsvLine(line: string): string[] {
   const result: string[] = []
   let current = ""
@@ -310,7 +336,7 @@ function parseRoute53Json(list: any[], domain: string) {
   return { records, skipped, notes, proxiedOrigins: [] as ProxiedOrigin[] }
 }
 
-function parseLine(line: string, domain: string): { record: AzionDnsRecord | null, note?: string } {
+function parseLine(line: string, domain: string): { record: AzionDnsRecord | null, note?: string, proxied?: boolean, usedDelimitedHeuristic?: boolean } {
   const original = line.trim()
 
   if (!original || original.startsWith("#") || original.startsWith(";") || original.startsWith("$")) {
@@ -319,7 +345,10 @@ function parseLine(line: string, domain: string): { record: AzionDnsRecord | nul
 
   if (/^(type|nome|name)\s+/i.test(original)) return { record: null }
 
-  const parts = tokens(original.replace(/[,;\t]+/g, " "))
+  const { record: recordPart, comment } = stripLineComment(original)
+  const proxiedTag = extractCloudflareProxiedTag(comment)
+
+  const parts = tokens(recordPart.replace(/[,\t]+/g, " "))
   if (parts.length < 3) return { record: null }
 
   let name = ""
@@ -374,7 +403,9 @@ function parseLine(line: string, domain: string): { record: AzionDnsRecord | nul
       rdata: values,
       ttl,
       description: "Imported by Azion AI Agent"
-    }
+    },
+    proxied: proxiedTag === true && (type === "A" || type === "AAAA"),
+    usedDelimitedHeuristic: /[,\t]/.test(recordPart)
   }
 }
 
@@ -382,13 +413,15 @@ function parseZoneFileLike(rawText: string, domain: string) {
   const records: AzionDnsRecord[] = []
   const skipped: string[] = []
   const notes: string[] = []
+  const proxiedOrigins: ProxiedOrigin[] = []
   let heuristicTableUsed = false
+  let proxiedCount = 0
 
   for (const line of String(rawText || "").split(/\r?\n/)) {
     const trimmed = line.trim()
     if (!trimmed) continue
 
-    const { record, note } = parseLine(line, domain)
+    const { record, note, proxied, usedDelimitedHeuristic } = parseLine(line, domain)
 
     if (note) {
       notes.push(note)
@@ -397,7 +430,14 @@ function parseZoneFileLike(rawText: string, domain: string) {
 
     if (record) {
       records.push(record)
-      if (/[,;\t]/.test(trimmed)) heuristicTableUsed = true
+      if (usedDelimitedHeuristic) heuristicTableUsed = true
+
+      if (proxied) {
+        proxiedCount += 1
+        const fqdn = record.name === "@" ? domain : `${record.name}.${domain}`
+        proxiedOrigins.push({ fqdn, originIp: record.rdata[0] })
+      }
+
       continue
     }
 
@@ -407,14 +447,18 @@ function parseZoneFileLike(rawText: string, domain: string) {
   }
 
   if (heuristicTableUsed) {
-    notes.push("Uma ou mais linhas foram interpretadas como tabela delimitada (CSV/ponto-e-vírgula/tab) pelo parser genérico, formato comum em exports de GoCache ou similares. Revise os registros antes de confirmar a execução.")
+    notes.push("Uma ou mais linhas foram interpretadas como tabela delimitada (CSV/tab) pelo parser genérico, formato comum em exports de GoCache ou similares. Revise os registros antes de confirmar a execução.")
   }
 
-  return { records, skipped, notes, proxiedOrigins: [] as ProxiedOrigin[] }
+  if (proxiedCount > 0) {
+    notes.push(`${proxiedCount} registro(s) estavam com Proxy status ativo no Cloudflare (cf_tags=cf-proxied:true). O valor de origem real foi importado, mas o tráfego deixará de passar pelo proxy do Cloudflare após a migração — configure Application/Workload na Azion para assumir esse papel.`)
+  }
+
+  return { records, skipped, notes, proxiedOrigins }
 }
 
 export function parseDnsImport(rawText: string, fallbackDomain?: string): DnsImportResult {
-  const text = String(rawText || "")
+  const text = unwrapMarkdownLinks(String(rawText || ""))
   const domain = inferDomain(text, fallbackDomain)
 
   const jsonBlock = extractJsonBlock(text)
