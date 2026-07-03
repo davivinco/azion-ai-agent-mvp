@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ExecutionHistory } from "./components/ExecutionHistory"
 import { TemplatesPanel } from "./components/TemplatesPanel"
+import { HelpPanel } from "./components/HelpPanel"
 import { PlannerBadge } from "./components/PlannerBadge"
 import { ActiveToggle } from "./components/ActiveToggle"
 import { ResourceSummary } from "./components/ResourceSummary"
@@ -125,7 +126,7 @@ export default function HomePage() {
   const [clientId, setClientId] = useState("")
   const [message, setMessage] = useState('Crie um firewall default chamado "Firewall Template"')
   const [activeOverride, setActiveOverride] = useState(false)
-  const [sidebarTab, setSidebarTab] = useState<"templates" | "history">("templates")
+  const [sidebarTab, setSidebarTab] = useState<"templates" | "history" | "help">("templates")
   const [plan, setPlan] = useState<Plan | null>(null)
   const [executionId, setExecutionId] = useState<string | null>(null)
   const [execution, setExecution] = useState<any>(null)
@@ -140,7 +141,7 @@ export default function HomePage() {
     }
   ])
 
-  const canExecute = useMemo(() => Boolean(apiToken && plan), [apiToken, plan])
+  const canExecute = useMemo(() => Boolean(apiToken && plan) && !executionId, [apiToken, plan, executionId])
 
   const chatWindowRef = useRef<HTMLDivElement | null>(null)
 
@@ -381,12 +382,21 @@ export default function HomePage() {
           >
             Histórico
           </button>
+          <button
+            type="button"
+            className={`sidebar-tab ${sidebarTab === "help" ? "selected" : ""}`}
+            onClick={() => setSidebarTab("help")}
+          >
+            Ajuda
+          </button>
         </div>
 
         {sidebarTab === "templates" ? (
           <TemplatesPanel />
-        ) : (
+        ) : sidebarTab === "history" ? (
           <ExecutionHistory onSelect={openAuditExecution} />
+        ) : (
+          <HelpPanel />
         )}
       </aside>
 
@@ -439,16 +449,20 @@ export default function HomePage() {
               </div>
             </div>
             <div className="execution-panel-row">
-              <div className="toggle-group">
-                <span className="toggle-label">Este plano</span>
-                <ActiveToggle
-                  active={Boolean(plan.active)}
-                  onChange={(next) => setPlan((current) => (current ? { ...current, active: next } : current))}
-                  disabled={Boolean(executionId) || loading}
-                />
-              </div>
+              {executionId ? (
+                <span className="status">{plan.active ? "Criado ativo" : "Criado desabilitado"}</span>
+              ) : (
+                <div className="toggle-group">
+                  <span className="toggle-label">Este plano</span>
+                  <ActiveToggle
+                    active={Boolean(plan.active)}
+                    onChange={(next) => setPlan((current) => (current ? { ...current, active: next } : current))}
+                    disabled={loading}
+                  />
+                </div>
+              )}
               <button className="btn" onClick={executePlan} disabled={!canExecute || loading}>
-                {!apiToken.trim() ? "Informe o API Token" : "Confirmar execução"}
+                {!apiToken.trim() ? "Informe o API Token" : executionId ? "Execução enviada" : "Confirmar execução"}
               </button>
             </div>
           </section>
@@ -461,12 +475,14 @@ export default function HomePage() {
             generatePlan()
           }}
         >
-          <div className="composer-toolbar">
-            <div className="toggle-group">
-              <span className="toggle-label">Novos comandos</span>
-              <ActiveToggle active={activeOverride} onChange={setActiveOverride} disabled={loading} />
+          {(!plan || executionId) ? (
+            <div className="composer-toolbar">
+              <div className="toggle-group">
+                <span className="toggle-label">Novos comandos</span>
+                <ActiveToggle active={activeOverride} onChange={setActiveOverride} disabled={loading} />
+              </div>
             </div>
-          </div>
+          ) : null}
           <div className="composer-input-row">
             <textarea
               value={message}
