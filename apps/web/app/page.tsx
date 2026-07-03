@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ExecutionHistory } from "./components/ExecutionHistory"
 import { TemplatesPanel } from "./components/TemplatesPanel"
 import { PlannerBadge } from "./components/PlannerBadge"
@@ -108,6 +108,14 @@ export default function HomePage() {
   ])
 
   const canExecute = useMemo(() => Boolean(apiToken && plan), [apiToken, plan])
+
+  const chatWindowRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const node = chatWindowRef.current
+    if (!node) return
+    node.scrollTop = node.scrollHeight
+  }, [messages])
 
   async function openAuditExecution(id: string) {
     setExecutionId(id)
@@ -361,7 +369,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        <div className="chat-window">
+        <div className="chat-window" ref={chatWindowRef}>
           {messages.map((item) => (
             <article key={item.id} className={`message ${item.role}`}>
               <div className="avatar">{item.role === "user" ? "D" : item.role === "system" ? "•" : "A"}</div>

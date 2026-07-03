@@ -836,6 +836,7 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
     const certificateId = certificateResponse?.data?.id
 
     const acmeRecords: any[] = []
+    const failedAcmeRecords: any[] = []
     for (const fqdn of group.domains) {
       const record = acmeChallengeRecord(fqdn, domain)
 
@@ -848,7 +849,7 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
         )
         acmeRecords.push({ input: record, response })
       } catch (error) {
-        acmeRecords.push({ input: record, error: error instanceof Error ? error.message : String(error) })
+        failedAcmeRecords.push({ input: record, error: error instanceof Error ? error.message : String(error) })
       }
     }
 
@@ -873,6 +874,7 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
       requestRules: firewallStack.requestRules,
       certificate: certificateResponse,
       acmeRecords,
+      failedAcmeRecords,
       application: applicationStack.application,
       connector: applicationStack.connector,
       workload: applicationStack.workload,

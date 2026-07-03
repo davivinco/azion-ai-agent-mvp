@@ -4,6 +4,7 @@ type ResourceRow = {
   id?: string | number
   active?: boolean
   count?: number
+  errors?: string[]
 }
 
 function getData(resource: any) {
@@ -27,6 +28,16 @@ function countRow(label: string, list: any): ResourceRow | null {
   return { label, count: list.length }
 }
 
+function failureRow(label: string, list: any): ResourceRow | null {
+  if (!Array.isArray(list) || list.length === 0) return null
+
+  return {
+    label,
+    count: list.length,
+    errors: list.map((item) => String(item?.error || "erro desconhecido"))
+  }
+}
+
 function buildRows(result: any): ResourceRow[] {
   if (!result) return []
 
@@ -44,7 +55,8 @@ function buildRows(result: any): ResourceRow[] {
     singleRow("DNS Zone", result.zone),
     countRow("DNS Records", result.records),
     countRow("Registros ACME (Let's Encrypt)", result.acmeRecords),
-    countRow("DNS Records com falha", result.failedRecords)
+    countRow("DNS Records com falha", result.failedRecords),
+    failureRow("Registros ACME com falha", result.failedAcmeRecords)
   ].filter(Boolean) as ResourceRow[]
 }
 
@@ -54,21 +66,30 @@ function RowList({ rows }: { rows: ResourceRow[] }) {
   return (
     <ul className="resource-summary-list">
       {rows.map((row) => (
-        <li key={row.label} className="resource-summary-row">
-          <span className="resource-summary-label">{row.label}</span>
-          {row.count !== undefined ? (
-            <span className="resource-summary-value">{row.count}</span>
-          ) : (
-            <span className="resource-summary-value">
-              {row.name || "—"}
-              {row.id ? <span className="resource-summary-id"> · ID {row.id}</span> : null}
-              {row.active !== undefined ? (
-                <span className={`resource-summary-active ${row.active ? "on" : "off"}`}>
-                  {row.active ? "active" : "inactive"}
-                </span>
-              ) : null}
-            </span>
-          )}
+        <li key={row.label} className="resource-summary-row-wrapper">
+          <div className="resource-summary-row">
+            <span className="resource-summary-label">{row.label}</span>
+            {row.count !== undefined ? (
+              <span className={`resource-summary-value ${row.errors ? "resource-summary-value-error" : ""}`}>{row.count}</span>
+            ) : (
+              <span className="resource-summary-value">
+                {row.name || "—"}
+                {row.id ? <span className="resource-summary-id"> · ID {row.id}</span> : null}
+                {row.active !== undefined ? (
+                  <span className={`resource-summary-active ${row.active ? "on" : "off"}`}>
+                    {row.active ? "active" : "inactive"}
+                  </span>
+                ) : null}
+              </span>
+            )}
+          </div>
+          {row.errors ? (
+            <ul className="resource-summary-errors">
+              {row.errors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          ) : null}
         </li>
       ))}
     </ul>
