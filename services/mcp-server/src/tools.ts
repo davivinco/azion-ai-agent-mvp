@@ -341,6 +341,8 @@ export async function dryRun(plan: Plan) {
       active: plan.active,
       wouldCreate: {
         domain: preview.domain,
+        records: preview.records,
+        recordsCount: preview.records.length,
         groups: groups.map((group) => {
           const host = pickCanonicalHostName(group.domains)
 
@@ -568,10 +570,14 @@ async function createApplicationStack(client: AzionClient, input: ApplicationSta
 
   if (workloadId && applicationId) {
     try {
-      const deploymentAttributes: Record<string, any> = { edge_application: applicationId }
-      if (input.edgeFirewallId) deploymentAttributes.edge_firewall = input.edgeFirewallId
+      // Confirmed via a real 400 from the API: the deployment requires its own
+      // `name`, and the strategy attribute keys are `application`/`firewall`,
+      // not `edge_application`/`edge_firewall`.
+      const deploymentAttributes: Record<string, any> = { application: applicationId }
+      if (input.edgeFirewallId) deploymentAttributes.firewall = input.edgeFirewallId
 
       deploymentResponse = await client.post(`/workspace/workloads/${workloadId}/deployments`, {
+        name: input.name,
         strategy: {
           type: "default",
           attributes: deploymentAttributes
@@ -730,6 +736,28 @@ function withProxiedMigrationHint(parsed: { notes: string[], proxiedOrigins: Pro
   ]
 }
 
+async function createDnsRecords(client: AzionClient, zoneId: number, records: any[]) {
+  const createdRecords: any[] = []
+  const failedRecords: any[] = []
+
+  for (const record of records) {
+    try {
+      const response = await postWithDnsFallback(
+        client,
+        `/edge_dns/zones/${zoneId}/records`,
+        `/workspace/dns/zones/${zoneId}/records`,
+        record
+      )
+
+      createdRecords.push({ input: record, response })
+    } catch (error) {
+      failedRecords.push({ input: record, error: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
+  return { createdRecords, failedRecords }
+}
+
 async function executeImportDns(plan: Plan, apiToken: string) {
   const client = new AzionClient(apiToken)
   const active = Boolean(plan.active)
@@ -767,29 +795,7 @@ async function executeImportDns(plan: Plan, apiToken: string) {
   )
 
   const zoneId = zoneResponse?.data?.id
-  const createdRecords: any[] = []
-  const failedRecords: any[] = []
-
-  for (const record of records) {
-    try {
-      const response = await postWithDnsFallback(
-        client,
-        `/edge_dns/zones/${zoneId}/records`,
-        `/workspace/dns/zones/${zoneId}/records`,
-        record
-      )
-
-      createdRecords.push({
-        input: record,
-        response
-      })
-    } catch (error) {
-      failedRecords.push({
-        input: record,
-        error: error instanceof Error ? error.message : String(error)
-      })
-    }
-  }
+  const { createdRecords, failedRecords } = await createDnsRecords(client, zoneId, records)
 
   return {
     zone: zoneResponse,
@@ -825,6 +831,13 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
   const zoneName = String(plan.parameters.zoneName || domain)
   const zoneResponse: any = await findOrCreateDnsZone(client, domain, zoneName, active)
   const zoneId = zoneResponse?.data?.id
+
+  // The user may ask to import the zone and migrate proxied domains in the same
+  // message, so this action must not assume import_dns already ran separately —
+  // ensure the zone's regular records exist too, not just the ACME challenges.
+  const { createdRecords, failedRecords } = parsed.records.length > 0
+    ? await createDnsRecords(client, zoneId, parsed.records)
+    : { createdRecords: [] as any[], failedRecords: [] as any[] }
 
   const groups = groupProxiedByOriginIp(parsed.proxiedOrigins)
   const stacks: any[] = []
@@ -890,6 +903,8 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
 
   return {
     zone: zoneResponse,
+    records: createdRecords,
+    failedRecords,
     stacks
   }
 }

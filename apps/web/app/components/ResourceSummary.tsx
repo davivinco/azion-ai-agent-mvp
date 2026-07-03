@@ -100,7 +100,7 @@ export function ResourceSummary({ result }: { result: any }) {
   if (!result) return null
 
   if (Array.isArray(result.stacks)) {
-    const zoneRows = buildRows({ zone: result.zone })
+    const zoneRows = buildRows({ zone: result.zone, records: result.records, failedRecords: result.failedRecords })
 
     if (result.stacks.length === 0 && zoneRows.length === 0) return null
 

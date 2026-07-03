@@ -98,6 +98,7 @@ type ProxiedGroupPreview = {
 
 async function fetchProxiedMigrationPreview(plan: any): Promise<{
   domain: string
+  records: PreviewRecord[]
   groups: ProxiedGroupPreview[]
   notes: string[]
 } | null> {
@@ -117,6 +118,7 @@ async function fetchProxiedMigrationPreview(plan: any): Promise<{
 
     return {
       domain: wouldCreate.domain || "",
+      records: wouldCreate.records || [],
       groups: wouldCreate.groups || [],
       notes: data.result.notes || []
     }
@@ -142,6 +144,10 @@ async function buildProxiedMigrationPlanMessage(plan: any) {
     `Zona: ${preview.domain || "não identificada"}`,
     ""
   ]
+
+  if (preview.records.length > 0) {
+    lines.push(`Registros DNS normais a criar na zona: ${preview.records.length}`, "")
+  }
 
   for (const group of preview.groups) {
     lines.push(`Host: ${group.host}`)
