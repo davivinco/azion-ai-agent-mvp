@@ -19,7 +19,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
+            mkdir -p /opt/azion-ai-agent-mvp
             cd /opt/azion-ai-agent-mvp
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin https://github.com/davivinco/azion-ai-agent-mvp.git
+            fi
             git fetch origin main
             git reset --hard origin/main
             docker compose up -d --build
