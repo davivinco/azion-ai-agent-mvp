@@ -697,7 +697,10 @@ function acmeChallengeRecord(fqdn: string, zoneDomain: string) {
     name,
     rdata: [`${fqdn}.letsencrypt.azion.com`],
     ttl: 300,
-    description: "Let's Encrypt DNS-01 challenge (Azion AI Agent)"
+    // Azion's DNS record description field rejects apostrophes/parentheses and
+    // caps out at 45 chars; keep this in the same plain style already used for
+    // regular imported records (see dns-parser.ts) which is known to pass validation.
+    description: "Imported by Azion AI Agent"
   }
 }
 

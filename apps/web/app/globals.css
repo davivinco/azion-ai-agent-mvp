@@ -363,11 +363,12 @@ button {
 }
 
 .composer textarea {
-  min-height: 120px;
-  max-height: 50vh;
+  min-height: 100px;
+  max-height: 240px;
   resize: vertical;
   background: var(--surface);
   border-radius: 18px;
+  overflow-y: auto;
 }
 
 .active-toggle {
