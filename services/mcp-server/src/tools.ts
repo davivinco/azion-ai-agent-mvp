@@ -832,9 +832,8 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
     const firewallStack = await createFirewallStack(client, { name: host, active })
     const firewallId = firewallStack.firewall?.data?.id
 
-    const certificateResponse: any = await requestLetsEncryptCertificate(client, { name: host, domains: group.domains })
-    const certificateId = certificateResponse?.data?.id
-
+    // Per Azion's Let's Encrypt guide, the DNS-01 challenge entry must exist
+    // before requesting/relying on the certificate, not after.
     const acmeRecords: any[] = []
     const failedAcmeRecords: any[] = []
     for (const fqdn of group.domains) {
@@ -852,6 +851,9 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
         failedAcmeRecords.push({ input: record, error: error instanceof Error ? error.message : String(error) })
       }
     }
+
+    const certificateResponse: any = await requestLetsEncryptCertificate(client, { name: host, domains: group.domains })
+    const certificateId = certificateResponse?.data?.id
 
     const applicationStack = await createApplicationStack(client, {
       name: host,
