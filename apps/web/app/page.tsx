@@ -27,6 +27,13 @@ type ChatMessage = {
   json?: unknown
 }
 
+const actionLabels: Record<string, string> = {
+  create_default_firewall: "Firewall",
+  create_application_and_workload: "Application + Workload",
+  import_dns: "Importação de DNS",
+  migrate_proxied_domains: "Migração de domínios proxied"
+}
+
 const promptExamples = [
   'Crie um firewall default chamado "Firewall Template"',
   'Crie um firewall default chamado "Firewall Template" ativo',
@@ -35,6 +42,32 @@ const promptExamples = [
   'Importe uma zona DNS para exemplo.com'
 ]
 
+
+function tryParseJsonStrings(value: unknown): unknown {
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return tryParseJsonStrings(JSON.parse(trimmed))
+      } catch {
+        return value
+      }
+    }
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(tryParseJsonStrings)
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, val]) => [key, tryParseJsonStrings(val)])
+    )
+  }
+
+  return value
+}
 
 function makeId() {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -382,7 +415,7 @@ export default function HomePage() {
                 {item.json ? (
                   <details className="technical-details">
                     <summary>Ver detalhes técnicos</summary>
-                    <pre>{JSON.stringify(item.json, null, 2)}</pre>
+                    <pre>{JSON.stringify(tryParseJsonStrings(item.json), null, 2)}</pre>
                   </details>
                 ) : null}
               </div>
@@ -393,18 +426,27 @@ export default function HomePage() {
         {plan ? (
           <section className="execution-panel">
             <div className="execution-panel-row">
-              <span className="status">{plan.action}</span>
-              <PlannerBadge planner={(plan as any).planner} />
-              {executionId ? <span className="status">Execution ID: {executionId}</span> : null}
-              {execution ? <span className={`status ${execution.status}`}>{statusLabel(execution)}</span> : null}
-              {!apiToken.trim() ? <span className="status warning">API Token obrigatório para executar</span> : null}
+              <div className="execution-panel-title">
+                <span className="execution-action-name">{actionLabels[plan.action] || plan.action}</span>
+                <PlannerBadge planner={(plan as any).planner} />
+              </div>
+              <div>
+                {executionId ? (
+                  <span className="status" title={executionId}>ID {executionId.slice(0, 8)}</span>
+                ) : null}
+                {execution ? <span className={`status ${execution.status}`}>{statusLabel(execution)}</span> : null}
+                {!apiToken.trim() ? <span className="status warning">Token obrigatório</span> : null}
+              </div>
             </div>
             <div className="execution-panel-row">
-              <ActiveToggle
-                active={Boolean(plan.active)}
-                onChange={(next) => setPlan((current) => (current ? { ...current, active: next } : current))}
-                disabled={Boolean(executionId) || loading}
-              />
+              <div className="toggle-group">
+                <span className="toggle-label">Este plano</span>
+                <ActiveToggle
+                  active={Boolean(plan.active)}
+                  onChange={(next) => setPlan((current) => (current ? { ...current, active: next } : current))}
+                  disabled={Boolean(executionId) || loading}
+                />
+              </div>
               <button className="btn" onClick={executePlan} disabled={!canExecute || loading}>
                 {!apiToken.trim() ? "Informe o API Token" : "Confirmar execução"}
               </button>
@@ -420,7 +462,10 @@ export default function HomePage() {
           }}
         >
           <div className="composer-toolbar">
-            <ActiveToggle active={activeOverride} onChange={setActiveOverride} disabled={loading} />
+            <div className="toggle-group">
+              <span className="toggle-label">Novos comandos</span>
+              <ActiveToggle active={activeOverride} onChange={setActiveOverride} disabled={loading} />
+            </div>
           </div>
           <div className="composer-input-row">
             <textarea

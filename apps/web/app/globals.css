@@ -341,6 +341,31 @@ button {
   gap: 7px;
 }
 
+.execution-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.execution-action-name {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-soft);
+}
+
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.toggle-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .composer {
   flex-shrink: 0;
   display: flex;
@@ -359,7 +384,12 @@ button {
 .composer-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 10px;
+}
+
+.composer-input-row .btn {
+  align-self: end;
 }
 
 .composer textarea {
