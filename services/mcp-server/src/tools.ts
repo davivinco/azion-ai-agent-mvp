@@ -200,6 +200,7 @@ async function listNetworkLists(client: AzionClient): Promise<NetworkListSummary
 async function resolveNetworkListsByName(client: AzionClient, names: string[]) {
   const networkLists = await listNetworkLists(client)
   const resolved = new Map<string, number>()
+  const missing: string[] = []
 
   for (const expectedName of names) {
     const found = networkLists.find((item) =>
@@ -207,13 +208,34 @@ async function resolveNetworkListsByName(client: AzionClient, names: string[]) {
     )
 
     if (!found?.id) {
-      throw new Error(`Network List not found by name: ${expectedName}`)
+      missing.push(expectedName)
+      continue
     }
 
     resolved.set(expectedName, Number(found.id))
   }
 
-  return resolved
+  return { resolved, missing }
+}
+
+function ruleRequiredNetworkListNames(rule: Record<string, any>): string[] {
+  const names = new Set<string>()
+
+  for (const group of rule.criteria || []) {
+    for (const criterion of group || []) {
+      const mappedName = NETWORK_LIST_NAME_MAP[String(criterion.argument)]
+      if (mappedName) names.add(mappedName)
+    }
+  }
+
+  return [...names]
+}
+
+async function resolveFunctionByName(client: AzionClient, name: string): Promise<number | undefined> {
+  const response: any = await client.get(`/workspace/functions?name=${encodeURIComponent(name)}&page_size=100`)
+  const results = extractResults(response)
+  const found = results.find((item) => String(item.name || "").toLowerCase().includes(name.toLowerCase()))
+  return found?.id ? Number(found.id) : undefined
 }
 
 function collectRequiredNetworkListNames(rules: Record<string, any>[]) {
@@ -257,11 +279,7 @@ function remapFirewallRuleNetworkLists(rule: Record<string, any>, resolvedByName
       if (!mappedName) continue
 
       const resolvedId = resolvedByName.get(mappedName)
-      if (!resolvedId) {
-        throw new Error(`Resolved Network List ID missing for: ${mappedName}`)
-      }
-
-      criterion.argument = resolvedId
+      if (resolvedId) criterion.argument = resolvedId
     }
   }
 
@@ -405,20 +423,40 @@ async function createFirewallStack(client: AzionClient, input: FirewallStackInpu
   const firewallResponse: any = await postWithUniqueNameFallback(client, "/workspace/firewalls", firewallPayload)
   const firewallId = firewallResponse?.data?.id
 
+  const warnings: string[] = []
+
   const createdFunctions: any[] = []
   for (const functionInstance of template.functions) {
+    // Function catalog entries (e.g. HoneyPot) are installed per-account via the
+    // Azion Marketplace, so the template's numeric id (from the source account) may
+    // not exist elsewhere, and installed copies are often renamed with a version
+    // suffix (e.g. "Honeypot 1.1"). Resolve by partial name match instead, and skip
+    // the function instance (rather than failing the whole firewall) if it isn't
+    // installed in this account.
+    const functionName = String(functionInstance.name || "")
+    const resolvedFunctionId = functionName ? await resolveFunctionByName(client, functionName) : undefined
+
+    if (!resolvedFunctionId) {
+      warnings.push(
+        `Função "${functionName}" não encontrada nesta conta — a function instance não foi criada. `
+        + "Instale a função pelo Marketplace da Azion se precisar desse recurso."
+      )
+      continue
+    }
+
     // Firewall Function Instances cannot be created with active=false in Azion API.
     // The firewall and request rules still follow the requested active flag, but
     // the function instance payload must omit active to avoid error 29002.
     const payload = omitKeysDeep(withoutId(functionInstance), new Set(["active"]))
+    payload.function = resolvedFunctionId
     const response = await client.post(`/workspace/firewalls/${firewallId}/functions`, payload)
     createdFunctions.push(response)
   }
 
-  const requiredNetworkListNames = collectRequiredNetworkListNames(template.request_rules)
-  const resolvedNetworkLists = requiredNetworkListNames.length > 0
+  const requiredNetworkListNames = [...new Set(template.request_rules.flatMap(ruleRequiredNetworkListNames))]
+  const { resolved: resolvedNetworkLists, missing: missingNetworkLists } = requiredNetworkListNames.length > 0
     ? await resolveNetworkListsByName(client, requiredNetworkListNames)
-    : new Map<string, number>()
+    : { resolved: new Map<string, number>(), missing: [] as string[] }
 
   const usesWaf = template.request_rules.some((rule) =>
     (rule.behaviors || []).some((behavior: Record<string, any>) => behavior.type === "set_waf")
@@ -437,6 +475,19 @@ async function createFirewallStack(client: AzionClient, input: FirewallStackInpu
 
   const createdRules: any[] = []
   for (const rule of template.request_rules) {
+    // Some rules reference custom, account-specific Network Lists from the source
+    // account (e.g. "MeuIP", "Cloud Providerse") that generally won't exist elsewhere.
+    // Rather than silently dropping a criterion (which could change what the rule
+    // actually matches), skip creating the whole rule and surface a clear warning.
+    const missingForRule = ruleRequiredNetworkListNames(rule).filter((n) => missingNetworkLists.includes(n))
+    if (missingForRule.length > 0) {
+      warnings.push(
+        `Regra "${rule.name}" não foi criada: depende da(s) Network List "${missingForRule.join('", "')}", `
+        + "que não existe(m) nesta conta. Crie a lista (ou ajuste a regra) e recrie-a manualmente se precisar dela."
+      )
+      continue
+    }
+
     let remappedRule = remapFirewallRuleNetworkLists(withoutId(rule), resolvedNetworkLists)
     if (wafId) remappedRule = remapFirewallRuleWaf(remappedRule, wafId, active)
     const payload = forceActive(remappedRule, active)
@@ -449,7 +500,8 @@ async function createFirewallStack(client: AzionClient, input: FirewallStackInpu
     functions: createdFunctions,
     networkLists: Object.fromEntries(resolvedNetworkLists),
     waf: wafResponse,
-    requestRules: createdRules
+    requestRules: createdRules,
+    warnings
   }
 }
 
@@ -893,6 +945,7 @@ async function executeMigrateProxiedDomains(plan: Plan, apiToken: string) {
       certificate: certificateResponse,
       acmeRecords,
       failedAcmeRecords,
+      firewallWarnings: firewallStack.warnings,
       application: applicationStack.application,
       connector: applicationStack.connector,
       workload: applicationStack.workload,

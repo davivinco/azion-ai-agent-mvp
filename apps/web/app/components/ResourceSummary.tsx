@@ -5,6 +5,7 @@ type ResourceRow = {
   active?: boolean
   count?: number
   errors?: string[]
+  warnings?: string[]
 }
 
 function getData(resource: any) {
@@ -38,6 +39,16 @@ function failureRow(label: string, list: any): ResourceRow | null {
   }
 }
 
+function warningsRow(label: string, list: any): ResourceRow | null {
+  if (!Array.isArray(list) || list.length === 0) return null
+
+  return {
+    label,
+    count: list.length,
+    warnings: list.map((item) => String(item))
+  }
+}
+
 function buildRows(result: any): ResourceRow[] {
   if (!result) return []
 
@@ -56,7 +67,8 @@ function buildRows(result: any): ResourceRow[] {
     countRow("DNS Records", result.records),
     countRow("Registros ACME (Let's Encrypt)", result.acmeRecords),
     countRow("DNS Records com falha", result.failedRecords),
-    failureRow("Registros ACME com falha", result.failedAcmeRecords)
+    failureRow("Registros ACME com falha", result.failedAcmeRecords),
+    warningsRow("Avisos do firewall", result.warnings || result.firewallWarnings)
   ].filter(Boolean) as ResourceRow[]
 }
 
@@ -87,6 +99,13 @@ function RowList({ rows }: { rows: ResourceRow[] }) {
             <ul className="resource-summary-errors">
               {row.errors.map((error, index) => (
                 <li key={index}>{error}</li>
+              ))}
+            </ul>
+          ) : null}
+          {row.warnings ? (
+            <ul className="resource-summary-warnings">
+              {row.warnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
               ))}
             </ul>
           ) : null}
