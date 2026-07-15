@@ -60,7 +60,7 @@
         [
           {
             "conditional": "if",
-            "variable": "${header_accept}",
+            "variable": "${header_user_agent}",
             "operator": "matches",
             "argument": "Mozilla/[1-4]|Chrome(\\/|\\:|\\ |:\\ )[1-9][0-9]\\.|Chrome\\/101\\.0|Firefox(\\/|\\:|\\ |:\\ )[1-9][0-9]\\."
           },
@@ -68,7 +68,7 @@
             "conditional": "and",
             "variable": "${header_user_agent}",
             "operator": "does_not_match",
-            "argument": "facebookexternalhit|Twitterbot|[P|p]interest|AdsBot-Google|AppEngine-Google|[G|g]ooglebot|Google\\ SketchUp|Mediapartners-Google|GoogleImageProxy|googleweblight|Google-Read-Aloud|bingbot|BingPreview|msnbot|WhatsApp|YahooSeeker|YahooMobileMail|Yahoo!|Outlook|Slackbot|Slack-ImgProxy|Yandex|SemrushBot|Amazon-Route53-Health-Check|FreshpingBot|PingdomTMS|[P|p]ingdom\\.com|[a|A]pplebot|Storebot-Google|GoogleOther|Google-Site-Verification|FeedFetcher-Google|GoogleProducer|APIs-Google\\.html|Google-InspectionTool|[lL]ighthouse"
+            "argument": "(facebookexternalhit|Twitterbot|[P|p]interest|AdsBot-Google|AppEngine-Google|[G|g]ooglebot|Google\\ SketchUp|Mediapartners-Google|GoogleImageProxy|googleweblight|Google-Read-Aloud|bingbot|BingPreview|msnbot|WhatsApp|YahooSeeker|YahooMobileMail|Yahoo!|Outlook|Slackbot|Slack-ImgProxy|Yandex|SemrushBot|Amazon-Route53-Health-Check|FreshpingBot|PingdomTMS|[P|p]ingdom\\.com|[a|A]pplebot|Storebot-Google|GoogleOther|Google-Site-Verification|FeedFetcher-Google|GoogleProducer|APIs-Google\\.html|Google-InspectionTool|[lL]ighthouse)"
           },
           {
             "conditional": "and",
