@@ -390,7 +390,13 @@ export default function HomePage() {
               className="prompt-chip"
               onClick={() => {
                 setMessage(example.text)
-                if (example.autoRun) generatePlan(example.text)
+                if (example.autoRun) {
+                  generatePlan(example.text)
+                } else {
+                  setPlan(null)
+                  setExecution(null)
+                  setExecutionId(null)
+                }
               }}
               disabled={loading}
             >

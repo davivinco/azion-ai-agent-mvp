@@ -58,14 +58,27 @@ function normalize(raw: any, input: Input): Plan {
     "migrate_proxied_domains"
   ]
 
-  const action = allowed.includes(raw?.action) ? raw.action : fallback.action
+  let action = allowed.includes(raw?.action) ? raw.action : fallback.action
+  let llmOverridden = false
 
-  const parameters =
-    raw?.parameters && typeof raw.parameters === "object"
+  // The rules fallback only picks a DNS action on explicit signals in the message
+  // (dns/zona/route53/cloudflare/proxied), so an LLM answer that routes such a
+  // message to a resource-creation action is almost certainly a misclassification.
+  // The reverse isn't true: the fallback's default action is application+workload,
+  // so a DNS answer from the LLM there must be respected.
+  const dnsActions = ["import_dns", "migrate_proxied_domains"]
+  if (dnsActions.includes(fallback.action) && !dnsActions.includes(action)) {
+    action = fallback.action
+    llmOverridden = true
+  }
+
+  const parameters = llmOverridden
+    ? fallback.parameters
+    : raw?.parameters && typeof raw.parameters === "object"
       ? raw.parameters
       : fallback.parameters
 
-  let title = String(raw?.title || fallback.title)
+  let title = llmOverridden ? fallback.title : String(raw?.title || fallback.title)
 
   if (action === "create_application_and_workload" && parameters.applicationName) {
     title = `Criar Application e Workload "${parameters.applicationName}"`
@@ -90,14 +103,21 @@ function normalize(raw: any, input: Input): Plan {
     ? input.activeOverride
     : typeof raw?.active === "boolean" ? raw.active : fallback.active
 
+  const steps = !llmOverridden && Array.isArray(raw?.steps) ? raw.steps.map(String) : fallback.steps
+  const warnings = !llmOverridden && Array.isArray(raw?.warnings) ? raw.warnings.map(String) : [...fallback.warnings]
+
+  if (llmOverridden) {
+    warnings.push("O LLM sugeriu outra ação, mas a mensagem contém sinais claros de DNS; mantida a ação detectada pelas regras.")
+  }
+
   return {
     action,
     title,
     clientId: String(raw?.clientId || input.clientId),
     active,
     parameters,
-    steps: Array.isArray(raw?.steps) ? raw.steps.map(String) : fallback.steps,
-    warnings: Array.isArray(raw?.warnings) ? raw.warnings.map(String) : fallback.warnings,
+    steps,
+    warnings,
     originalPrompt: input.message
   }
 }
