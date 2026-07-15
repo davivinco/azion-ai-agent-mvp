@@ -32,6 +32,7 @@ function wantsProxiedMigration(message: string) {
     || lower.includes("lets encrypt")
     || lower.includes("let's encrypt")
     || lower.includes("certificado")
+    || lower.includes("migr")
 
   return mentionsProxied && mentionsMigrationIntent
 }

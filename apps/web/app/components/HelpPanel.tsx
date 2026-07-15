@@ -20,8 +20,8 @@ export function HelpPanel() {
           <ul>
             <li><strong>Firewall:</strong> "Crie um firewall default chamado 'Nome'"</li>
             <li><strong>Application + Workload:</strong> "Crie uma application e workload chamado 'Nome' para dominio.com.br"</li>
-            <li><strong>Importar DNS:</strong> "Importe uma zona DNS para dominio.com" + cole o export (Cloudflare CSV/zonefile, Route53 JSON, ou qualquer zonefile BIND)</li>
-            <li><strong>Migrar domínios proxied:</strong> depois de importar um DNS com registros "Proxy status" ativo no Cloudflare, peça para migrar o stack completo (cria Connector, Application, Firewall e Workload por host, mais o certificado Let's Encrypt)</li>
+            <li><strong>Importar DNS:</strong> "Importe essa zona DNS para a Azion:" + cole o export na mesma mensagem (Cloudflare CSV/zonefile, Route53 JSON, ou qualquer zonefile BIND)</li>
+            <li><strong>Migrar domínios proxied:</strong> "Importe essas entradas DNS e migre o stack completo para os domínios proxied:" + cole o export da Cloudflare — em uma única mensagem ele importa o DNS e cria Connector (IP de origem real), Application, Firewall, Workload e certificado Let's Encrypt por host</li>
           </ul>
         </details>
 

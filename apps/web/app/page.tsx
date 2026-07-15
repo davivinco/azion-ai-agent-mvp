@@ -35,12 +35,41 @@ const actionLabels: Record<string, string> = {
   migrate_proxied_domains: "Migração de domínios proxied"
 }
 
-const promptExamples = [
-  'Crie um firewall default chamado "Firewall Template"',
-  'Crie um firewall default chamado "Firewall Template" ativo',
-  'Crie uma application e workload chamado "Loja Teste"',
-  'Crie uma application e workload chamado "Loja Teste" para loja-teste.com.br',
-  'Importe uma zona DNS para exemplo.com'
+type PromptExample = {
+  label: string
+  hint?: string
+  text: string
+  autoRun: boolean
+}
+
+const promptExamples: PromptExample[] = [
+  {
+    label: "Criar template de segurança (Firewall + WAF)",
+    text: 'Crie um firewall default chamado "Firewall Template"',
+    autoRun: true
+  },
+  {
+    label: "Criar template de segurança já ativo",
+    text: 'Crie um firewall default chamado "Firewall Template" ativo',
+    autoRun: true
+  },
+  {
+    label: "Criar Application + Workload para um domínio",
+    text: 'Crie uma application e workload chamado "Loja Teste" para loja-teste.com.br',
+    autoRun: true
+  },
+  {
+    label: "Importar zona DNS de outro provedor",
+    hint: "Preenche o comando — cole o export do provedor antes de gerar o plano",
+    text: "Importe essa zona DNS para a Azion:\n\n<cole aqui o export do seu provedor: Cloudflare (CSV ou zone file), Route53 (JSON) ou zone file BIND>",
+    autoRun: false
+  },
+  {
+    label: "Migrar domínios proxied da Cloudflare (stack completo)",
+    hint: "Preenche o comando — cole o export da Cloudflare antes de gerar o plano",
+    text: "Importe essas entradas DNS na Azion e migre o stack completo (connector, application, firewall, workload e certificado Let's Encrypt) para os domínios proxied:\n\n<cole aqui o export da Cloudflare com os registros Proxied>",
+    autoRun: false
+  }
 ]
 
 
@@ -354,15 +383,16 @@ export default function HomePage() {
           <span className="label">Exemplos de prompts</span>
           {promptExamples.map((example) => (
             <button
-              key={example}
+              key={example.label}
               className="prompt-chip"
               onClick={() => {
-                setMessage(example)
-                generatePlan(example)
+                setMessage(example.text)
+                if (example.autoRun) generatePlan(example.text)
               }}
               disabled={loading}
             >
-              {example}
+              {example.label}
+              {example.hint ? <small className="prompt-chip-hint">{example.hint}</small> : null}
             </button>
           ))}
         </div>

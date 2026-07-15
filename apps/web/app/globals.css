@@ -141,6 +141,14 @@ button {
   background: var(--surface);
 }
 
+.prompt-chip-hint {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .prompt-chip:disabled {
   opacity: .45;
   cursor: not-allowed;
