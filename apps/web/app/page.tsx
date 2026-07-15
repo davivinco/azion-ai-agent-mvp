@@ -7,7 +7,8 @@ import { HelpPanel } from "./components/HelpPanel"
 import { PlannerBadge } from "./components/PlannerBadge"
 import { ActiveToggle } from "./components/ActiveToggle"
 import { ResourceSummary } from "./components/ResourceSummary"
-import { buildPlanMessage } from "./lib/planMessage"
+import { PlanSummary, type PlanView } from "./components/PlanSummary"
+import { buildPlanView } from "./lib/planMessage"
 
 type Plan = {
   action: string
@@ -26,6 +27,7 @@ type ChatMessage = {
   title?: string
   content: string
   json?: unknown
+  planView?: PlanView | null
 }
 
 const actionLabels: Record<string, string> = {
@@ -268,15 +270,16 @@ export default function HomePage() {
     }
 
     setPlan(planWithPrompt)
-    const planMessageContent = await buildPlanMessage(planWithPrompt)
+    const planMessage = await buildPlanView(planWithPrompt)
     setMessages((current) => [
       ...current,
       {
         id: makeId(),
         role: "assistant",
         title: planWithPrompt?.title || "Plano gerado",
-        content: planMessageContent,
-        json: planWithPrompt
+        content: planMessage.content,
+        json: planWithPrompt,
+        planView: planMessage.view
       }
     ])
     setLoading(false)
@@ -380,7 +383,7 @@ export default function HomePage() {
         </div>
 
         <div className="examples-card">
-          <span className="label">Exemplos de prompts</span>
+          <span className="label">Comece por aqui</span>
           {promptExamples.map((example) => (
             <button
               key={example.label}
@@ -432,12 +435,9 @@ export default function HomePage() {
 
       <section className="chat-shell">
         <header className="chat-header">
-          <div>
-            <h1>Azion AI Agent</h1>
-            <p>Criação assistida de recursos Azion com plano, fila e executor MCP.</p>
-          </div>
+          <span className="chat-header-crumb">Criação assistida de recursos Azion — plano, revisão e execução</span>
           <div className="header-pills">
-            <span className="badge">VPN / Sandbox / MVP</span>
+            <span className="badge">Sandbox</span>
             <PlannerBadge planner={(plan as any)?.planner || "llm"} />
           </div>
         </header>
@@ -449,6 +449,7 @@ export default function HomePage() {
               <div className="bubble">
                 {item.title ? <strong>{item.title}</strong> : null}
                 <p className="message-text">{item.content}</p>
+                {item.planView ? <PlanSummary view={item.planView} /> : null}
                 {(item.json as any)?.status !== "failed" ? (
                   <ResourceSummary result={(item.json as any)?.result} />
                 ) : null}
@@ -465,35 +466,33 @@ export default function HomePage() {
 
         {plan ? (
           <section className="execution-panel">
-            <div className="execution-panel-row">
-              <div className="execution-panel-title">
+            <div className="execution-panel-inner">
+              <div className="execution-panel-left">
                 <span className="execution-action-name">{actionLabels[plan.action] || plan.action}</span>
                 <PlannerBadge planner={(plan as any).planner} />
-              </div>
-              <div>
                 {executionId ? (
                   <span className="status" title={executionId}>ID {executionId.slice(0, 8)}</span>
                 ) : null}
                 {execution ? <span className={`status ${execution.status}`}>{statusLabel(execution)}</span> : null}
                 {!apiToken.trim() ? <span className="status warning">Token obrigatório</span> : null}
               </div>
-            </div>
-            <div className="execution-panel-row">
-              {executionId ? (
-                <span className="status">{plan.active ? "Criado ativo" : "Criado desabilitado"}</span>
-              ) : (
-                <div className="toggle-group">
-                  <span className="toggle-label">Este plano</span>
-                  <ActiveToggle
-                    active={Boolean(plan.active)}
-                    onChange={(next) => setPlan((current) => (current ? { ...current, active: next } : current))}
-                    disabled={loading}
-                  />
-                </div>
-              )}
-              <button className="btn" onClick={executePlan} disabled={!canExecute || loading}>
-                {!apiToken.trim() ? "Informe o API Token" : executionId ? "Execução enviada" : "Confirmar execução"}
-              </button>
+              <div className="execution-panel-right">
+                {executionId ? (
+                  <span className="status">{plan.active ? "Criado ativo" : "Criado desabilitado"}</span>
+                ) : (
+                  <div className="toggle-group">
+                    <span className="toggle-label">Este plano</span>
+                    <ActiveToggle
+                      active={Boolean(plan.active)}
+                      onChange={(next) => setPlan((current) => (current ? { ...current, active: next } : current))}
+                      disabled={loading}
+                    />
+                  </div>
+                )}
+                <button className="btn" onClick={executePlan} disabled={!canExecute || loading}>
+                  {!apiToken.trim() ? "Informe o API Token" : executionId ? "Execução enviada" : "Confirmar execução"}
+                </button>
+              </div>
             </div>
           </section>
         ) : null}
@@ -505,23 +504,25 @@ export default function HomePage() {
             generatePlan()
           }}
         >
-          {(!plan || executionId) ? (
-            <div className="composer-toolbar">
-              <div className="toggle-group">
-                <span className="toggle-label">Novos comandos</span>
-                <ActiveToggle active={activeOverride} onChange={setActiveOverride} disabled={loading} />
-              </div>
-            </div>
-          ) : null}
-          <div className="composer-input-row">
+          <div className="composer-box">
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Ex: Crie um firewall default chamado Firewall Template"
+              placeholder='Descreva o que criar — ex: Crie um firewall default chamado "Firewall Template"'
             />
-            <button className="btn" disabled={loading || !message.trim()}>
-              Gerar plano
-            </button>
+            <div className="composer-footer">
+              {(!plan || executionId) ? (
+                <div className="toggle-group">
+                  <span className="toggle-label">Novos comandos</span>
+                  <ActiveToggle active={activeOverride} onChange={setActiveOverride} disabled={loading} />
+                </div>
+              ) : (
+                <span className="composer-note">Ajuste ativo/desabilitado deste plano no painel acima</span>
+              )}
+              <button className="btn" disabled={loading || !message.trim()}>
+                Gerar plano
+              </button>
+            </div>
           </div>
         </form>
       </section>
