@@ -254,16 +254,19 @@ function collectRequiredNetworkListNames(rules: Record<string, any>[]) {
   return [...names]
 }
 
-function remapFirewallRuleWaf(rule: Record<string, any>, wafId: number, active: boolean) {
+function remapFirewallRuleWaf(rule: Record<string, any>, wafId: number) {
   const cloned = structuredClone(rule)
 
   for (const behavior of cloned.behaviors || []) {
     if (behavior.type !== "set_waf") continue
 
+    // WAFs should always start in logging (monitor-only) mode, regardless of the
+    // active/disabled toggle — a freshly created ruleset shouldn't block real
+    // traffic until it's been reviewed. Switching to blocking is a manual step.
     behavior.attributes = {
       ...behavior.attributes,
       waf_id: wafId,
-      mode: active ? "blocking" : "logging"
+      mode: "logging"
     }
   }
 
@@ -306,7 +309,7 @@ export async function dryRun(plan: Plan) {
         waf: {
           name: `${String(plan.parameters.firewallName || template.firewall.name)} - WAF`,
           createdPerAccount: true,
-          mode: plan.active ? "blocking" : "logging"
+          mode: "logging"
         }
       }
     }
@@ -489,7 +492,7 @@ async function createFirewallStack(client: AzionClient, input: FirewallStackInpu
     }
 
     let remappedRule = remapFirewallRuleNetworkLists(withoutId(rule), resolvedNetworkLists)
-    if (wafId) remappedRule = remapFirewallRuleWaf(remappedRule, wafId, active)
+    if (wafId) remappedRule = remapFirewallRuleWaf(remappedRule, wafId)
     const payload = forceActive(remappedRule, active)
     const response = await client.post(`/workspace/firewalls/${firewallId}/request_rules`, payload)
     createdRules.push(response)

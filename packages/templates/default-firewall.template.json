@@ -105,7 +105,7 @@
           "type": "set_waf",
           "attributes": {
             "waf_id": 14289,
-            "mode": "blocking"
+            "mode": "logging"
           }
         }
       ],
